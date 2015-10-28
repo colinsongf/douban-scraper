@@ -1,6 +1,4 @@
-
 from urllib.request import urlopen
-from urllib.parse import urljoin
 from urllib.parse import urlparse
 
 from bs4 import BeautifulSoup
@@ -61,8 +59,7 @@ class AwardCategory:
             self.celebrities = celebrities
 
 class PosterLibrary:
-    def __init__(self, movie_url):
-        poster_url = urljoin(movie_url,"photos?type=R")
+    def __init__(self, poster_url):
         html = urlopen(poster_url)
         bs_html = BeautifulSoup(html.read(), "html.parser")
         bs_poster_list = bs_html.select_one("#content > div > div.article > ul")
@@ -86,6 +83,9 @@ class Movie:
         html = urlopen(url)
         bs_html = BeautifulSoup(html.read(), "html.parser")
         self.name = bs_html.select_one("#content > h1 > span:nth-of-type(1)").string
+        bs_top250_no = bs_html.select_one("#content > div.top250 > span.top250-no")
+        if bs_top250_no is not None:
+            self.top250_no = bs_top250_no.get_text(strip=True)
 
         bs_info = bs_html.select_one("#info")
 
@@ -156,10 +156,10 @@ class Movie:
         self.rating_num = bs_interest_sectl.select_one("div.rating_wrap.clearbox > div.rating_self").string
         self.votes = bs_interest_sectl.find(property = "v:votes").string
 
-        self.award_info = AwardInfo(urljoin(self.url,"awards"))
+        self.award_info = AwardInfo("http://movie.douban.com/subject/{0:s}/awards/".format(self.id))
 
 
-        self.poster_library = PosterLibrary(self.url)
+        self.poster_library = PosterLibrary("http://movie.douban.com/subject/{0:s}/photos?type=R".format(self.id))
 
 
 
