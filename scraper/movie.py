@@ -1,6 +1,8 @@
 
 from urllib.request import urlopen
 from urllib.parse import urljoin
+from urllib.parse import urlparse
+
 from bs4 import BeautifulSoup
 
 __author__ = 'Luke'
@@ -14,13 +16,49 @@ class Celebrity:
     def __str__(self):
         return "Celebrity: %s, %s" % (self.name, self.id)
 
+class AwardInfo:
+    def __init__(self, award_url):
+        html = urlopen(award_url)
+        bs_html = BeautifulSoup(html.read(), "html.parser")
+        bs_award_list = bs_html.find_all("div", attrs={"class": "awards"})
+        awards = []
+        for bs_award in bs_award_list:
+            award = Award(bs_award)
+            if award is not None:
+                awards.append(award)
+
+        self.awards = awards
+
+
 class Award:
-    def __init__(self,bs_award_element):
-        bs_award_list = bs_award_element.find_all("li")
-        self.name = bs_award_list[0].get_text()
-        self.detail = bs_award_list[1].get_text()
-        if len(bs_award_list) == 3:
-            self.owners = [item.strip() for item in bs_award_list[2].get_text().split("/")]
+    def __init__(self,bs_award):
+        title_list = list(bs_award.select_one("div > h2").children)
+        self.name = title_list[0]
+        self.yeal = title_list[1].get_text(strip=True)
+
+        bs_award_uls = bs_award.find_all("ul", attrs={"class": "award"})
+
+        award_categories = []
+        for bs_award_ul in bs_award_uls:
+            award_category = AwardCategory(bs_award_ul)
+            if award_category is not  None:
+                award_categories.append(award_category)
+        self.award_categories = award_categories
+
+class AwardCategory:
+    def __init__(self, bs_award_ul):
+        bs_award_lis = bs_award_ul.find_all("li")
+        if len(bs_award_lis) >= 1:
+            self.name = bs_award_lis[0].get_text(strip=True)
+        if len(bs_award_lis) >= 2:
+            bs_celebrities = bs_award_lis[1]
+            bs_celebrity_as = bs_celebrities.find_all("a")
+            celebrities = []
+            for bs_celebrity_a in bs_celebrity_as:
+                celebrity = Celebrity(bs_celebrity_a)
+                if celebrity is not None:
+                    celebrities.append(celebrity)
+            self.celebrities = celebrities
 
 class PosterLibrary:
     def __init__(self, movie_url):
@@ -43,6 +81,8 @@ class Movie:
 
     def __init__(self, url):
         self.url = url
+        self.id = list(filter(None, urlparse(url).path.split("/")))[-1]
+
         html = urlopen(url)
         bs_html = BeautifulSoup(html.read(), "html.parser")
         self.name = bs_html.select_one("#content > h1 > span:nth-of-type(1)").string
@@ -113,16 +153,10 @@ class Movie:
         self.summary = bs_html.find(property = "v:summary").get_text(strip=True)
 
         bs_interest_sectl = bs_html.select_one("#interest_sectl")
-        self.rating_num = bs_interest_sectl.select_one("div.rating_wrap.clearbox > p.rating_self.clearfix > strong").string
+        self.rating_num = bs_interest_sectl.select_one("div.rating_wrap.clearbox > div.rating_self").string
         self.votes = bs_interest_sectl.find(property = "v:votes").string
 
-        bs_awards = bs_html.find_all("ul", attrs={"class": "award"})
-        awards = []
-        for bs_award in bs_awards:
-            award = Award(bs_award)
-            if award is not None:
-                awards.append(award)
-        self.awards = awards
+        self.award_info = AwardInfo(urljoin(self.url,"awards"))
 
 
         self.poster_library = PosterLibrary(self.url)
@@ -132,7 +166,6 @@ class Movie:
 
 
 
-m = Movie("http://movie.douban.com/subject/24325923/?tag=%E7%83%AD%E9%97%A8&from=gaia")
-poster_url = urljoin("http://movie.douban.com/subject/25962735/?from=showing","photos?type=R")
+m = Movie("http://movie.douban.com/subject/3541415/")
 
 print(m.language)
